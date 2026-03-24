@@ -3,6 +3,7 @@ import studentsRouter from './students.js';
 import coursesRouter from './courses.js';
 import certificatesRouter from './certificates.js';
 import enrollmentsRouter from './enrollments.js';
+import feedbackRouter from '../feedback/feedback.routes.js';
 
 const router = Router();
 
@@ -11,6 +12,7 @@ router.use('/students', studentsRouter);
 router.use('/courses', coursesRouter);
 router.use('/certificates', certificatesRouter);
 router.use('/enrollments', enrollmentsRouter);
+router.use('/feedback', feedbackRouter);
 
 // Placeholder routes for future features
 // These can be replaced with actual routers as features are developed

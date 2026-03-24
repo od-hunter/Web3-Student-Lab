@@ -23,6 +23,7 @@ model Student {
 
   enrollments   Enrollment[]
   certificates  Certificate[]
+  feedback      Feedback[]
 
   @@map("students")
 }
@@ -38,6 +39,7 @@ model Course {
 
   enrollments   Enrollment[]
   certificates  Certificate[]
+  feedback      Feedback[]
 
   @@map("courses")
 }
@@ -68,4 +70,20 @@ model Enrollment {
 
   @@unique([studentId, courseId])
   @@map("enrollments")
+}
+
+model Feedback {
+  id          String   @id @default(cuid())
+  studentId   String
+  courseId    String
+  rating      Int      // Rating from 1 to 5
+  review      String?  // Optional text review
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  student     Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  course      Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, courseId]) // One review per student per course
+  @@map("feedback")
 }
