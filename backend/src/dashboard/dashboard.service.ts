@@ -16,6 +16,12 @@ export const getStudentDashboard = async (studentId: string): Promise<StudentDas
       where: { id: studentId },
       include: {
         certificates: true,
+        enrollments: {
+          orderBy: {
+            enrolledAt: 'asc',
+          },
+          take: 1,
+        },
       },
     });
   } catch (dbError) {
@@ -27,10 +33,16 @@ export const getStudentDashboard = async (studentId: string): Promise<StudentDas
     return {
       userId: studentId,
       progress: {
-        userId: studentId,
+        studentId,
+        courseId: 'course-1',
         completedLessons: ['lesson-1', 'lesson-2'],
-        currentModule: 'mod-2',
+        currentModuleId: 'mod-2',
         percentage: 45,
+        status: 'in_progress',
+        lastAccessedAt: new Date(),
+        completedAt: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
       },
       certificates: [
         {
@@ -56,8 +68,9 @@ export const getStudentDashboard = async (studentId: string): Promise<StudentDas
   }
 
   // Unified Student Profile View across modules
+  const enrolledCourseId = student.enrollments[0]?.courseId ?? 'course-1';
   const [learningProgress, blockchainAchievements, tokenWallet] = await Promise.all([
-    getStudentProgress(studentId),
+    getStudentProgress(studentId, enrolledCourseId),
     getStudentAchievements(studentId),
     getTokenBalance(studentId),
   ]);
@@ -84,7 +97,7 @@ export const getStudentDashboard = async (studentId: string): Promise<StudentDas
   // Aggregated Activity Logging
   const recentActivity = [`Joined Web3 Student Lab on ${student.createdAt.toLocaleDateString()}`];
 
-  if (learningProgress.completedLessons.length > 0) {
+  if (learningProgress && learningProgress.completedLessons.length > 0) {
     recentActivity.push(`Completed ${learningProgress.completedLessons.length} lessons`);
   }
 
@@ -94,7 +107,18 @@ export const getStudentDashboard = async (studentId: string): Promise<StudentDas
 
   return {
     userId: studentId,
-    progress: learningProgress,
+    progress: learningProgress ?? {
+      studentId,
+      courseId: enrolledCourseId,
+      completedLessons: [],
+      currentModuleId: null,
+      percentage: 0,
+      status: 'not_started',
+      lastAccessedAt: null,
+      completedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    },
     certificates,
     tokenBalance,
     recentActivity,

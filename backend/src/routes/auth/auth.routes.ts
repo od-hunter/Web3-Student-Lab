@@ -1,6 +1,7 @@
 import { Request, Response, Router } from 'express';
 import { authenticate } from '../../auth/auth.middleware.js';
 import { login, register } from '../../auth/auth.service.js';
+import { LoginRequest } from '../../auth/types.js';
 import { loginSchema, registerSchema } from '../../auth/validation.schemas.js';
 import { validateRequest } from '../../utils/validation.js';
 

@@ -1,43 +1,171 @@
-import { Progress } from './types.js';
+import prisma from '../../db/index.js';
+import { getCurriculumForCourse } from './curriculum.data.js';
+import { CurriculumCourse, Module, Progress, ProgressStatus, ProgressUpdateInput } from './types.js';
 
-// Mock user progress storage (keeping consistency with existing routes)
-const userProgress: Map<string, Progress> = new Map();
+const toProgress = (progress: {
+  id: string;
+  studentId: string;
+  courseId: string;
+  completedLessons: string[];
+  currentModuleId: string | null;
+  percentage: number;
+  status: string;
+  lastAccessedAt: Date | null;
+  completedAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}): Progress => ({
+  ...progress,
+  status: progress.status as ProgressStatus,
+});
 
-/**
- * Service to manage student progress in the learning platform.
- */
-export const getStudentProgress = async (studentId: string): Promise<Progress> => {
-  const progress = userProgress.get(studentId);
-
-  if (!progress) {
-    // Return default progress if user has no progress yet
-    return {
-      userId: studentId,
-      completedLessons: [],
-      currentModule: 'mod-1',
-      percentage: 0,
-    };
+const filterModulesByDifficulty = (modules: Module[], difficulty?: string): Module[] => {
+  if (!difficulty) {
+    return modules;
   }
 
-  return progress;
+  return modules
+    .map((module) => ({
+      ...module,
+      lessons: module.lessons.filter((lesson) => lesson.difficulty === difficulty),
+    }))
+    .filter((module) => module.lessons.length > 0);
 };
 
-// In real app, this logic would move from learning.routes.ts to here
-export const updateProgress = async (studentId: string, lessonId: string): Promise<Progress> => {
-  // Logic from routes/learning/learning.routes.ts
-  let progress = userProgress.get(studentId) || {
-    userId: studentId,
-    completedLessons: [],
-    currentModule: 'mod-1',
-    percentage: 0,
-  };
+const countLessons = (modules: Module[]): number => {
+  return modules.reduce((total, module) => total + module.lessons.length, 0);
+};
 
-  if (!progress.completedLessons.includes(lessonId)) {
-    progress.completedLessons.push(lessonId);
-    // Calculation simplified here
-    progress.percentage = Math.min(100, Math.round((progress.completedLessons.length / 10) * 100));
+const buildCourseStatus = (completedLessonCount: number, totalLessons: number): ProgressStatus => {
+  if (completedLessonCount === 0) {
+    return 'not_started';
   }
 
-  userProgress.set(studentId, progress);
-  return progress;
+  if (totalLessons > 0 && completedLessonCount >= totalLessons) {
+    return 'completed';
+  }
+
+  return 'in_progress';
+};
+
+const buildPercentage = (
+  completedLessonCount: number,
+  totalLessons: number,
+  explicitPercentage?: number,
+): number => {
+  if (typeof explicitPercentage === 'number') {
+    return explicitPercentage;
+  }
+
+  if (totalLessons === 0) {
+    return 0;
+  }
+
+  return Math.round((completedLessonCount / totalLessons) * 100);
+};
+
+export const listCourses = async (difficulty?: string): Promise<CurriculumCourse[]> => {
+  const courses = await prisma.course.findMany({
+    orderBy: { createdAt: 'asc' },
+  });
+
+  return courses.map((course) => ({
+    ...course,
+    modules: filterModulesByDifficulty(getCurriculumForCourse(course.id), difficulty),
+  }));
+};
+
+export const getCourseCurriculum = async (
+  courseId: string,
+  difficulty?: string,
+): Promise<CurriculumCourse | null> => {
+  const course = await prisma.course.findUnique({
+    where: { id: courseId },
+  });
+
+  if (!course) {
+    return null;
+  }
+
+  return {
+    ...course,
+    modules: filterModulesByDifficulty(getCurriculumForCourse(course.id), difficulty),
+  };
+};
+
+export const getStudentProgress = async (
+  studentId: string,
+  courseId: string,
+): Promise<Progress | null> => {
+  const progress = await prisma.learningProgress.findUnique({
+    where: {
+      studentId_courseId: {
+        studentId,
+        courseId,
+      },
+    },
+  });
+
+  return progress ? toProgress(progress) : null;
+};
+
+export const updateStudentProgress = async (
+  studentId: string,
+  courseId: string,
+  input: ProgressUpdateInput,
+): Promise<Progress> => {
+  const modules = getCurriculumForCourse(courseId);
+  const lesson = modules.flatMap((module) => module.lessons).find((entry) => entry.id === input.lessonId);
+
+  if (!lesson) {
+    throw new Error('LESSON_NOT_FOUND');
+  }
+
+  const moduleForLesson = modules.find((module) =>
+    module.lessons.some((entry) => entry.id === input.lessonId),
+  );
+  const totalLessons = countLessons(modules);
+  const existingProgress = await getStudentProgress(studentId, courseId);
+
+  const completedLessonSet = new Set(existingProgress?.completedLessons ?? []);
+
+  if (input.status === 'completed') {
+    completedLessonSet.add(input.lessonId);
+  } else {
+    completedLessonSet.delete(input.lessonId);
+  }
+
+  const completedLessons = Array.from(completedLessonSet);
+  const percentage = buildPercentage(completedLessons.length, totalLessons, input.percentage);
+  const status = buildCourseStatus(completedLessons.length, totalLessons);
+  const completedAt = status === 'completed' ? new Date() : null;
+
+  const progress = await prisma.learningProgress.upsert({
+    where: {
+      studentId_courseId: {
+        studentId,
+        courseId,
+      },
+    },
+    update: {
+      completedLessons,
+      currentModuleId: moduleForLesson?.id ?? existingProgress?.currentModuleId ?? null,
+      percentage,
+      status,
+      lastAccessedAt: new Date(),
+      completedAt,
+    },
+    create: {
+      studentId,
+      courseId,
+      completedLessons,
+      currentModuleId: moduleForLesson?.id ?? null,
+      percentage,
+      status,
+      lastAccessedAt: new Date(),
+      completedAt,
+    },
+  });
+
+  return toProgress(progress);
 };
