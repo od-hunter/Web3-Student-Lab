@@ -1,43 +1,34 @@
 import { Progress } from './types.js';
-
-// Mock user progress storage (keeping consistency with existing routes)
-const userProgress: Map<string, Progress> = new Map();
+import { getProgress, recordStageCompletion } from '../../learning/progress.js';
 
 /**
  * Service to manage student progress in the learning platform.
+ * Delegates to the progress persistence module for database-backed storage.
  */
 export const getStudentProgress = async (studentId: string): Promise<Progress> => {
-  const progress = userProgress.get(studentId);
-
-  if (!progress) {
-    // Return default progress if user has no progress yet
-    return {
-      userId: studentId,
-      completedLessons: [],
-      currentModule: 'mod-1',
-      percentage: 0,
-    };
-  }
-
-  return progress;
+  const progress = await getProgress(studentId);
+  return {
+    userId: progress.userId,
+    completedLessons: progress.completedLessons,
+    currentModule: progress.currentModule,
+    percentage: progress.percentage,
+  };
 };
 
-// In real app, this logic would move from learning.routes.ts to here
-export const updateProgress = async (studentId: string, lessonId: string): Promise<Progress> => {
-  // Logic from routes/learning/learning.routes.ts
-  let progress = userProgress.get(studentId) || {
-    userId: studentId,
-    completedLessons: [],
-    currentModule: 'mod-1',
-    percentage: 0,
+export const updateProgress = async (
+  studentId: string,
+  lessonId: string,
+  moduleId: string = 'mod-1',
+  totalLessons: number = 4,
+): Promise<Progress> => {
+  const progress = await recordStageCompletion(
+    { studentId, stageId: lessonId, moduleId },
+    totalLessons,
+  );
+  return {
+    userId: progress.userId,
+    completedLessons: progress.completedLessons,
+    currentModule: progress.currentModule,
+    percentage: progress.percentage,
   };
-
-  if (!progress.completedLessons.includes(lessonId)) {
-    progress.completedLessons.push(lessonId);
-    // Calculation simplified here
-    progress.percentage = Math.min(100, Math.round((progress.completedLessons.length / 10) * 100));
-  }
-
-  userProgress.set(studentId, progress);
-  return progress;
 };
