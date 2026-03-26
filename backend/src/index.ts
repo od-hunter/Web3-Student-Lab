@@ -1,10 +1,10 @@
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express, { Request, Response } from 'express';
-import prisma from './db/index';
-import { requestLogger } from './middleware/requestLogger';
-import routes from './routes/index';
-import { validateEnvironment } from './utils/checkEnv';
+import prisma from './db/index.js';
+import { requestLogger } from './middleware/requestLogger.js';
+import routes from './routes/index.js';
+import { validateEnvironment } from './utils/checkEnv.js';
 
 // Load environment variables
 dotenv.config();
