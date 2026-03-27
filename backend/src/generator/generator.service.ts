@@ -1,4 +1,5 @@
 import OpenAI from 'openai';
+import logger from '../utils/logger.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -63,7 +64,7 @@ export class GeneratorService {
 
       return JSON.parse(content) as ProjectIdea;
     } catch (error) {
-      console.error('Error generating project idea:', error);
+      logger.error(`Error generating project idea: ${error}`);
       throw new Error('Failed to generate project idea');
     }
   }

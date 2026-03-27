@@ -1,4 +1,5 @@
 import prisma from '../db/index.js';
+import logger from '../utils/logger.js';
 
 export interface TokenWallet {
   symbol: string;
@@ -33,6 +34,6 @@ export const grantTokens = async (
   amount: number
 ): Promise<{ success: boolean }> => {
   // logic to record token grants/transfers
-  console.log(`Granting ${amount} STUD tokens to student ${studentId}`);
+  logger.info(`Granting ${amount} STUD tokens to student ${studentId}`);
   return { success: true };
 };
